@@ -4,11 +4,12 @@
  * Disciplina: Algoritmos e Pensamento Computacional (ALGPC)
  *
  * Objetivo do Projeto:
- *   Combinar um deslocamento fixo (SHIFT, estilo Cifra de Cesar) com o termo
- *   variavel de uma sequencia matematica (seq[i]) por meio da formula:
+ *   Combinar um deslocamento fixo (SHIFT) com o termo variavel de uma
+ *   sequencia matematica (seq[i]) pela formula:
  *       nova_letra = aplicaShift(letra, SHIFT + seq[i])
- *   Isso impede que letras repetidas na palavra original gerem a mesma letra
- *   cifrada, aumentando a seguranca contra analise de frequencia.
+ *   No modo de decifragem por forca bruta, o programa percorre todos os
+ *   intervalos informados (SHIFT, a/q da PG e a/r da PA) por meio de lacos
+ *   'for' aninhados e exibe todas as combinacoes linha por linha.
  * ============================================================================
  */
 
@@ -18,17 +19,24 @@
 
 #define MAX_LETRAS 15 /* Limite maximo de caracteres exigido pela atividade */
 
-/* Funcao auxiliar: limpa o '\n' (Enter) residual do buffer do teclado apos o scanf,
- * evitando que a leitura da proxima palavra no laco do-while seja pulada. */
+/* Funcao auxiliar: limpa o '\n' (Enter) residual do teclado apos o scanf */
 void limparBuffer(void) {
     int c;
     while ((c = getchar()) != '\n' && c != EOF);
 }
 
+/* Funcao auxiliar: garante que 'inicio' seja menor ou igual a 'fim' */
+void garantirOrdem(int *inicio, int *fim) {
+    if (*inicio > *fim) {
+        int aux = *inicio;
+        *inicio = *fim;
+        *fim = aux;
+    }
+}
+
 /* ============================================================================
  * BLOCO 1: NORMALIZACAO DA ENTRADA
- * Prepara a palavra conforme as regras da atividade: apenas letras minusculas
- * de 'a' a 'z', sem espacos, hifens, acentos ou cedilha (maximo de 15 letras).
+ * Converte para minusculas ('a'..'z') e remove espacos, hifens, acentos e 'ç'.
  * ============================================================================ */
 int normalizarPalavra(const char *entrada, char *saida) {
     int j = 0;
@@ -36,8 +44,7 @@ int normalizarPalavra(const char *entrada, char *saida) {
         unsigned char c = (unsigned char)entrada[i];
         char letra = '\0';
 
-        /* Caracteres acentuados e 'ç' em UTF-8 ocupam 2 bytes iniciados por 0xC3 */
-        if (c == 0xC3 && entrada[i + 1] != '\0') {
+        if (c == 0xC3 && entrada[i + 1] != '\0') { /* Trata UTF-8 (acentos e 'ç') */
             unsigned char segundoByte = (unsigned char)entrada[++i] | 0x20;
             if (segundoByte >= 0xA0 && segundoByte <= 0xA5) letra = 'a';
             else if (segundoByte == 0xA7)                    letra = 'c';
@@ -49,7 +56,6 @@ int normalizarPalavra(const char *entrada, char *saida) {
             letra = (char)tolower(c);
         }
 
-        /* Descarta espacos, hifens e simbolos; mantem apenas 'a'..'z' */
         if (letra >= 'a' && letra <= 'z') {
             saida[j++] = letra;
         }
@@ -60,11 +66,9 @@ int normalizarPalavra(const char *entrada, char *saida) {
 
 /* ============================================================================
  * BLOCO 2: GERADORES DE SEQUENCIAS NUMERICAS (seq[i])
- * Cada funcao preenche o vetor seq[] com 'n' termos (um para cada letra da
- * palavra), fornecendo o deslocamento variavel da cifra hibrida.
  * ============================================================================ */
 
-/* Gera os 'n' primeiros Numeros Primos (ex: 2, 3, 5, 7, 11...) */
+/* Gera os 'n' primeiros Numeros Primos (2, 3, 5, 7, 11...) */
 void gerarPrimos(int seq[], int n) {
     int numeroAtual = 2, encontrados = 0;
     while (encontrados < n) {
@@ -88,36 +92,30 @@ void gerarFibonacci(int seq[], int n) {
     }
 }
 
-/* Gera uma Progressao Aritmetica (PA): soma constante da razao 'r' a partir de 'a1' */
-void gerarPA(int seq[], int n, int termoInicial_a1, int razaoPA_r) {
+/* Gera uma Progressao Aritmetica (PA) usando termo inicial 'a' e razao 'r' */
+void gerarPA(int seq[], int n, int pa_a, int pa_r) {
     for (int i = 0; i < n; i++) {
-        seq[i] = termoInicial_a1 + i * razaoPA_r;
+        seq[i] = pa_a + i * pa_r;
     }
 }
 
-/* Gera uma Progressao Geometrica (PG): multiplicacao sucessiva pela razao 'q' */
-void gerarPG(int seq[], int n, int termoInicial_a1, int razaoPG_q) {
-    int termoAtual = termoInicial_a1;
+/* Gera uma Progressao Geometrica (PG) usando termo inicial 'a' e razao 'q' */
+void gerarPG(int seq[], int n, int pg_a, int pg_q) {
+    long long termoAtual = pg_a; /* long long evita estouro em potencias grandes */
     for (int i = 0; i < n; i++) {
-        seq[i] = termoAtual;
-        termoAtual *= razaoPG_q;
+        seq[i] = (int)(termoAtual % 26);
+        termoAtual *= pg_q;
     }
 }
 
 /* ============================================================================
  * BLOCO 3: MOTOR DE DESLOCAMENTO E CIFRAGEM / DECIFRAGEM
- * Implementa a aritmetica modular circular no alfabeto de 26 letras ('a'..'z').
  * ============================================================================ */
-
-/* Aplica o deslocamento total (SHIFT + seq[i]) garantindo rotacao circular [0..25] */
 char aplicaShift(char letra, int deslocamento) {
     int posicaoAlfabeto = (letra - 'a' + (deslocamento % 26) + 26) % 26;
     return (char)('a' + posicaoAlfabeto);
 }
 
-/* Percorre a palavra aplicando a formula da cifra hibrida:
- *   direcao =  1 -> avanca no alfabeto (CIFRAR)
- *   direcao = -1 -> retrocede no alfabeto (DECIFRAR) */
 void processarPalavra(const char *entrada, int shift, const int seq[], int direcao, char *saida) {
     int tamanho = (int)strlen(entrada);
     for (int i = 0; i < tamanho; i++) {
@@ -128,64 +126,77 @@ void processarPalavra(const char *entrada, int shift, const int seq[], int direc
 }
 
 /* ============================================================================
- * BLOCO 4: EXECUCAO DAS SEQUENCIAS E FORCA BRUTA (PA E PG PARAMETRIZADAS)
- * Testa todas as sequencias previstas no projeto (Primos, Fibonacci, PA e PG).
- * Para PA e PG, cruza todas as combinacoes de termo inicial (a1) e razao (r ou q)
- * dentro do intervalo [inicioIntervaloPAPG .. fimIntervaloPAPG].
+ * BLOCO 4: FORCA BRUTA COMPLETA (IMPRIME TODAS AS COMBINACOES DOS FOR)
+ * Cruza todos os valores de:
+ *   - shift: [shiftInicio .. shiftFim]
+ *   - PG:    a de [pg_a_inicio .. pg_a_fim] e q de [pg_q_inicio .. pg_q_fim]
+ *   - PA:    a de [pa_a_inicio .. pa_a_fim] e r de [pa_r_inicio .. pa_r_fim]
+ *   - Alem de Primos e Fibonacci para cada SHIFT testado.
  * ============================================================================ */
-void executarTodasSequencias(const char *palavra, int tamanho, int shift, int direcao,
-                             int inicioIntervaloPAPG, int fimIntervaloPAPG) {
+void executarForcaBrutaCompleta(const char *palavra, int tamanho, int direcao,
+                                int shiftInicio, int shiftFim,
+                                int pg_a_inicio, int pg_a_fim, int pg_q_inicio, int pg_q_fim,
+                                int pa_a_inicio, int pa_a_fim, int pa_r_inicio, int pa_r_fim) {
     int seq[MAX_LETRAS];
-    char palavraProcessada[MAX_LETRAS + 1];
+    char palavraResultado[MAX_LETRAS + 1];
+    int totalCombinacoes = 0;
 
     if (direcao == 1) {
-        printf("\n=== CIFRANDO \"%s\" (Tamanho: %d | SHIFT: %d) ===\n", palavra, tamanho, shift);
+        printf("\n================ CIFRANDO TODAS AS VARIACOES ================\n");
     } else {
-        printf("\n=== DECIFRANDO POR FORCA BRUTA \"%s\" (Tamanho: %d | SHIFT: %d) ===\n", palavra, tamanho, shift);
+        printf("\n========== DECIFRANDO POR FORCA BRUTA (TODAS AS LINHAS) ==========\n");
     }
 
-    /* 1. Teste com Numeros Primos */
-    gerarPrimos(seq, tamanho);
-    processarPalavra(palavra, shift, seq, direcao, palavraProcessada);
-    printf(" [Numeros Primos]          -> %s\n", palavraProcessada);
+    for (int shift = shiftInicio; shift <= shiftFim; shift++) {
+        printf("\n-------------------- [ SHIFT = %d ] --------------------\n", shift);
 
-    /* 2. Teste com Serie de Fibonacci */
-    gerarFibonacci(seq, tamanho);
-    processarPalavra(palavra, shift, seq, direcao, palavraProcessada);
-    printf(" [Serie de Fibonacci]      -> %s\n", palavraProcessada);
+        /* 1. Numeros Primos */
+        gerarPrimos(seq, tamanho);
+        processarPalavra(palavra, shift, seq, direcao, palavraResultado);
+        printf(" [SHIFT=%d | Primos]               -> %s\n", shift, palavraResultado);
+        totalCombinacoes++;
 
-    /* 3. Teste com todas as variacoes de Progressao Aritmetica (PA) no intervalo */
-    printf("\n --- Progressao Aritmetica (PA): variando a1 e razao r de %d ate %d ---\n",
-           inicioIntervaloPAPG, fimIntervaloPAPG);
-    for (int termoInicial_a1 = inicioIntervaloPAPG; termoInicial_a1 <= fimIntervaloPAPG; termoInicial_a1++) {
-        for (int razaoPA_r = inicioIntervaloPAPG; razaoPA_r <= fimIntervaloPAPG; razaoPA_r++) {
-            gerarPA(seq, tamanho, termoInicial_a1, razaoPA_r);
-            processarPalavra(palavra, shift, seq, direcao, palavraProcessada);
-            printf(" [PA | a1=%d, razao r=%d]   -> %s\n", termoInicial_a1, razaoPA_r, palavraProcessada);
+        /* 2. Serie de Fibonacci */
+        gerarFibonacci(seq, tamanho);
+        processarPalavra(palavra, shift, seq, direcao, palavraResultado);
+        printf(" [SHIFT=%d | Fibonacci]            -> %s\n", shift, palavraResultado);
+        totalCombinacoes++;
+
+        /* 3. Todas as variacoes de PG (termo inicial 'a' e razao 'q') */
+        for (int a = pg_a_inicio; a <= pg_a_fim; a++) {
+            for (int q = pg_q_inicio; q <= pg_q_fim; q++) {
+                gerarPG(seq, tamanho, a, q);
+                processarPalavra(palavra, shift, seq, direcao, palavraResultado);
+                printf(" [SHIFT=%d | PG: a=%d, q=%d]        -> %s\n", shift, a, q, palavraResultado);
+                totalCombinacoes++;
+            }
+        }
+
+        /* 4. Todas as variacoes de PA (termo inicial 'a' e razao 'r') */
+        for (int a = pa_a_inicio; a <= pa_a_fim; a++) {
+            for (int r = pa_r_inicio; r <= pa_r_fim; r++) {
+                gerarPA(seq, tamanho, a, r);
+                processarPalavra(palavra, shift, seq, direcao, palavraResultado);
+                printf(" [SHIFT=%d | PA: a=%d, r=%d]        -> %s\n", shift, a, r, palavraResultado);
+                totalCombinacoes++;
+            }
         }
     }
 
-    /* 4. Teste com todas as variacoes de Progressao Geometrica (PG) no intervalo */
-    printf("\n --- Progressao Geometrica (PG): variando a1 e razao q de %d ate %d ---\n",
-           inicioIntervaloPAPG, fimIntervaloPAPG);
-    for (int termoInicial_a1 = inicioIntervaloPAPG; termoInicial_a1 <= fimIntervaloPAPG; termoInicial_a1++) {
-        for (int razaoPG_q = inicioIntervaloPAPG; razaoPG_q <= fimIntervaloPAPG; razaoPG_q++) {
-            gerarPG(seq, tamanho, termoInicial_a1, razaoPG_q);
-            processarPalavra(palavra, shift, seq, direcao, palavraProcessada);
-            printf(" [PG | a1=%d, razao q=%d]   -> %s\n", termoInicial_a1, razaoPG_q, palavraProcessada);
-        }
-    }
+    printf("\n==================================================================\n");
+    printf("Total de combinacoes geradas: %d linhas.\n", totalCombinacoes);
 }
 
 /* ============================================================================
- * BLOCO 5: PROGRAMA PRINCIPAL (INTERFACE INTERATIVA EM LOOP)
- * Permite cifrar palavras do proprio grupo ou decifrar palavras de outros
- * grupos repetidamente ate o usuario optar por encerrar.
+ * BLOCO 5: PROGRAMA PRINCIPAL (LOOP DO-WHILE)
  * ============================================================================ */
 int main(void) {
     char entradaBruta[64];
     char palavraNorm[MAX_LETRAS + 1];
-    int opcaoModo, shift, inicioIntervaloPAPG, fimIntervaloPAPG, continuarExecucao;
+    int opcaoModo, continuarExecucao;
+    int shiftInicio, shiftFim;
+    int pg_a_inicio, pg_a_fim, pg_q_inicio, pg_q_fim;
+    int pa_a_inicio, pa_a_fim, pa_r_inicio, pa_r_fim;
 
     do {
         printf("\n============================================================\n");
@@ -205,9 +216,9 @@ int main(void) {
 
         printf("Palavra normalizada: %s (%d letras)\n\n", palavraNorm, tamanhoPalavra);
 
-        printf("Escolha a operacao desejada:\n");
-        printf(" 1 - Cifrar palavra (gerar opcoes para enviar a outro grupo)\n");
-        printf(" 2 - Decifrar palavra (forca bruta com tamanho e SHIFT conhecidos)\n");
+        printf("Escolha a operacao:\n");
+        printf(" 1 - Cifrar\n");
+        printf(" 2 - Decifrar (Forca Bruta)\n");
         printf("Opcao: ");
         scanf("%d", &opcaoModo);
 
@@ -218,33 +229,50 @@ int main(void) {
             continue;
         }
 
-        printf("Digite o valor do SHIFT fixo: ");
-        scanf("%d", &shift);
+        /* Leitura do intervalo do SHIFT */
+        printf("\n--- Configuracao do SHIFT (se for fixo, digite o mesmo numero nos dois) ---\n");
+        printf("SHIFT inicial (ex: 1): ");
+        scanf("%d", &shiftInicio);
+        printf("SHIFT final   (ex: 5): ");
+        scanf("%d", &shiftFim);
+        garantirOrdem(&shiftInicio, &shiftFim);
 
-        printf("\nConfiguracao das sequencias PA e PG (termo inicial a1 e razao r/q):\n");
-        printf("Digite o valor INICIAL do intervalo para PA e PG (ex: 3): ");
-        scanf("%d", &inicioIntervaloPAPG);
-        printf("Digite o valor FINAL do intervalo para PA e PG (ex: 5): ");
-        scanf("%d", &fimIntervaloPAPG);
+        /* Leitura dos intervalos da PG (a e q) */
+        printf("\n--- Configuracao da PG (termo inicial 'a' e razao 'q') ---\n");
+        printf("PG -> 'a' inicial (ex: 4): ");
+        scanf("%d", &pg_a_inicio);
+        printf("PG -> 'a' final   (ex: 8): ");
+        scanf("%d", &pg_a_fim);
+        garantirOrdem(&pg_a_inicio, &pg_a_fim);
 
-        /* Garante que o inicio seja menor ou igual ao fim caso sejam invertidos */
-        if (inicioIntervaloPAPG > fimIntervaloPAPG) {
-            int auxiliar = inicioIntervaloPAPG;
-            inicioIntervaloPAPG = fimIntervaloPAPG;
-            fimIntervaloPAPG = auxiliar;
-        }
+        printf("PG -> 'q' inicial (ex: 2): ");
+        scanf("%d", &pg_q_inicio);
+        printf("PG -> 'q' final   (ex: 6): ");
+        scanf("%d", &pg_q_fim);
+        garantirOrdem(&pg_q_inicio, &pg_q_fim);
+
+        /* Leitura dos intervalos da PA (a e r) */
+        printf("\n--- Configuracao da PA (termo inicial 'a' e razao 'r') ---\n");
+        printf("PA -> 'a' inicial (ex: 6): ");
+        scanf("%d", &pa_a_inicio);
+        printf("PA -> 'a' final   (ex: 8): ");
+        scanf("%d", &pa_a_fim);
+        garantirOrdem(&pa_a_inicio, &pa_a_fim);
+
+        printf("PA -> 'r' inicial (ex: 3): ");
+        scanf("%d", &pa_r_inicio);
+        printf("PA -> 'r' final   (ex: 7): ");
+        scanf("%d", &pa_r_fim);
+        garantirOrdem(&pa_r_inicio, &pa_r_fim);
 
         int direcao = (opcaoModo == 1) ? 1 : -1;
-        executarTodasSequencias(palavraNorm, tamanhoPalavra, shift, direcao,
-                                inicioIntervaloPAPG, fimIntervaloPAPG);
-
-        if (opcaoModo == 1) {
-            printf("\nDados da operação -> Tamanho: %d | SHIFT: %d\n",
-                   tamanhoPalavra, shift);
-        }
+        executarForcaBrutaCompleta(palavraNorm, tamanhoPalavra, direcao,
+                                   shiftInicio, shiftFim,
+                                   pg_a_inicio, pg_a_fim, pg_q_inicio, pg_q_fim,
+                                   pa_a_inicio, pa_a_fim, pa_r_inicio, pa_r_fim);
 
         printf("\n------------------------------------------------------------\n");
-        printf("Deseja realizar outra cifragem ou decifragem? (1 - Sim / 0 - Sair): ");
+        printf("Deseja testar outra palavra ou decifrar? (1 - Sim / 0 - Sair): ");
         scanf("%d", &continuarExecucao);
         limparBuffer();
 
