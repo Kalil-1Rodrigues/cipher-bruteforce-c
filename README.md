@@ -19,6 +19,12 @@ Dessa forma, ocorrências repetidas de uma mesma letra na palavra original resul
 2. **Compartilhamento:** Apenas a palavra cifrada, o tamanho da palavra e o `SHIFT` são informados aos demais grupos.
 3. **Decifragem (Força Bruta):** O programa recebe a palavra cifrada, o `SHIFT` e um intervalo de parâmetros $[a_1, r/q]$, gerando automaticamente todas as hipóteses de sequências para recuperar a palavra original.
 
+### Novidades da versão (Refatoração e Força Bruta Completa)
+- **Força Bruta Parametrizada:** Adicionado suporte a intervalos independentes para `SHIFT`, PG (`a`, `q`) e PA (`a`, `r`), exibindo todas as combinações possíveis linha a linha com contador total de tentativas.
+- **Prevenção de Overflow:** Atualização do cálculo da PG para `long long` com redução modular iterativa (`% 26`).
+- **UX no Terminal:** Separação dos inputs de início/fim de intervalo, ordenação automática de limites invertidos (`garantirOrdem`), limpeza de buffer (`limparBuffer`) e menu em loop (`do-while`) para múltiplas execuções seguidas.
+- **Legibilidade:** Padronização de nomes de variáveis e documentação modular em 5 blocos.
+
 ---
 
 ## Funcionalidades Implementadas
